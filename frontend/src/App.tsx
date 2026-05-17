@@ -346,6 +346,9 @@ export default function App() {
           }
         }
       }
+      if (message.type === "kernel.restarted" || message.type === "kernel.ready") {
+        setKernelStatus("idle");
+      }
     };
 
     return () => {
@@ -596,6 +599,19 @@ export default function App() {
     setPrompts({});
     // Clear all outputs so every cell's output panel collapses
     setOutputs({});
+  };
+
+  const restartKernel = () => {
+    const sock = socketRef.current;
+    if (sock?.readyState === WebSocket.OPEN) {
+      sock.send(JSON.stringify({ type: "restart" }));
+    }
+    pendingCellsRef.current.clear();
+    setRunningAll(false);
+    setStatuses({});
+    setPrompts({});
+    setOutputs({});
+    setKernelStatus("connecting");
   };
 
   const clearOutputs = () => {
@@ -901,7 +917,7 @@ export default function App() {
         onRunAll={runAll}
         onStopAll={stopAll}
         onClearOutputs={clearOutputs}
-        onRestartKernel={() => socketRef.current?.send(JSON.stringify({ type: "restart" }))}
+        onRestartKernel={restartKernel}
         onKernelSelect={(kernel) => updateNotebook(c => ({ ...c, kernel_name: kernel }))}
         onOpenProfile={() => setShowProfile(true)}
         onLogout={logout}

@@ -68,7 +68,8 @@ export function Navbar({
   };
 
   const isConnected = kernelStatus === "idle" || kernelStatus === "busy";
-  const connectColor = isConnected ? "var(--success)" : kernelStatus === "connecting" ? "var(--warning)" : "var(--error)";
+  // User requested: Connect shows in red while connecting or reconnecting. Green only if working.
+  const connectColor = isConnected ? "var(--success)" : "var(--error)";
 
   return (
     <nav className="navbar glass-panel">
