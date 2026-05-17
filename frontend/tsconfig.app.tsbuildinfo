@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/fileexplorer.tsx","./src/lib/api.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/cell.tsx","./src/components/filetree.tsx","./src/components/fileviewer.tsx","./src/components/navbar.tsx","./src/components/profilemodal.tsx","./src/components/sidebar.tsx","./src/lib/api.ts"],"version":"5.9.3"}

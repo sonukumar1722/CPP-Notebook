@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import base64
+import uuid
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +13,9 @@ import bcrypt
 from app.db import get_db
 from app.models import User
 from app.services.auth import create_access_token, get_current_user
+from app.core.config import settings
+
+AVATAR_DIR = settings.workspace_root.parent / "avatars"
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -91,3 +100,55 @@ async def logout():
 @router.get("/me")
 async def me(current_user: User = Depends(get_current_user)):
     return _profile(current_user)
+
+
+class ProfileUpdateJSON(BaseModel):
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+
+
+@router.post("/profile")
+async def update_profile(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update profile. Accepts multipart/form-data (with optional avatar file) or JSON."""
+    content_type = request.headers.get("content-type", "")
+    avatar_url: Optional[str] = current_user.avatar_url
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        display_name = form.get("display_name") or current_user.display_name
+        bio = form.get("bio") or current_user.bio
+        avatar_file = form.get("file")
+
+        if avatar_file and hasattr(avatar_file, "read"):
+            AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+            ext = Path(avatar_file.filename or "avatar.jpg").suffix.lower()
+            fname = f"{current_user.id}{ext}"
+            dest = AVATAR_DIR / fname
+            content = await avatar_file.read()
+            dest.write_bytes(content)
+            avatar_url = f"/api/auth/avatar/{fname}"
+    else:
+        body = await request.json()
+        display_name = body.get("display_name") or current_user.display_name
+        bio = body.get("bio", current_user.bio)
+
+    current_user.display_name = str(display_name)
+    current_user.bio = str(bio) if bio is not None else None
+    current_user.avatar_url = avatar_url
+    await db.commit()
+    await db.refresh(current_user)
+    return _profile(current_user)
+
+
+@router.get("/avatar/{filename}")
+async def get_avatar(filename: str):
+    """Serve avatar images."""
+    from fastapi.responses import FileResponse
+    path = AVATAR_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return FileResponse(path)

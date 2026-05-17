@@ -115,14 +115,23 @@ export const api = {
         throw new Error("Failed to read file");
       }
       const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        return response.json();
-      } else if (contentType.includes("text/") || path.endsWith(".txt") || path.endsWith(".md") || path.endsWith(".cpp") || path.endsWith(".h")) {
-        const payload = await response.json().catch(() => null);
-        if (payload?.content) return payload.content;
-        return response.text();
+      // Images → Blob
+      if (
+        contentType.includes("image/") ||
+        /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(path)
+      ) {
+        return response.blob();
       }
-      return response.blob();
+      // Notebooks are stored as JSON documents. Other text files are wrapped
+      // by the backend as { content }, even though the response is JSON.
+      if (path.endsWith(".cpynb")) {
+        return response.json();
+      }
+      // Text files → backend wraps in { content: "..." }
+      const payload = await response.json().catch(() => null);
+      if (payload && typeof payload.content === "string") return payload.content;
+      // fallback
+      return "";
     },
     write(token: string, path: string, content: string | object) {
       return request<{status: string}>("/api/fs/write", {
