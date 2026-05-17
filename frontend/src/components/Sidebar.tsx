@@ -83,10 +83,9 @@ export function Sidebar({
         {/* Active file path strip */}
         {activePath && (
           <div style={{
-            fontSize: 10, color: "var(--accent-light)", padding: "6px 12px",
+            fontSize: 10, color: "var(--muted)", padding: "6px 12px",
             borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            background: "rgba(8,145,178,0.1)",
           }} title={`/${activePath}`}>
             📄 /{activePath}
           </div>

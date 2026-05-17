@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import React, { FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { api } from "./lib/api";
@@ -239,7 +240,15 @@ export default function App() {
         const content = textFromFileRead(data);
         textContentRef.current = content;
         setTextContent(content);
-      }).catch(console.error);
+      }).catch((e) => {
+        if (activePath && activePath.match(/^untitled-\d+\.txt$/i)) {
+          textContentRef.current = "";
+          setTextContent("");
+          setIsDirty(true);
+        } else {
+          console.error(e);
+        }
+      });
     }
 
     return () => {
@@ -553,10 +562,9 @@ export default function App() {
   const stopCell = useCallback((cellId?: string) => {
     const sock = socketRef.current;
     if (sock?.readyState === WebSocket.OPEN) {
-      sock.send(JSON.stringify({ type: "interrupt" }));
-      // Send an empty stdin reply so xeus-cling's stdin pump unblocks
-      // cleanly after being interrupted while waiting for user input.
-      sock.send(JSON.stringify({ type: "input_reply", value: "" }));
+      // Interrupts often fail to fully recover the kernel in xeus-cling.
+      // Restarting guarantees a clean state for the next run.
+      sock.send(JSON.stringify({ type: "restart" }));
     }
     if (cellId) {
       setStatuses((state) => ({ ...state, [cellId]: "idle" }));
@@ -569,6 +577,7 @@ export default function App() {
       // Clear the output panel immediately so the cell looks clean
       setOutputs((state) => ({ ...state, [cellId]: [] }));
     }
+    setKernelStatus("connecting");
   }, []);
 
   const runAll = () => {
@@ -581,9 +590,7 @@ export default function App() {
   const stopAll = () => {
     const sock = socketRef.current;
     if (sock?.readyState === WebSocket.OPEN) {
-      sock.send(JSON.stringify({ type: "interrupt" }));
-      // Unblock any xeus-cling stdin pump waiting for user input
-      sock.send(JSON.stringify({ type: "input_reply", value: "" }));
+      sock.send(JSON.stringify({ type: "restart" }));
     }
     pendingCellsRef.current.clear();
     setRunningAll(false);
@@ -599,6 +606,7 @@ export default function App() {
     setPrompts({});
     // Clear all outputs so every cell's output panel collapses
     setOutputs({});
+    setKernelStatus("connecting");
   };
 
   const restartKernel = () => {
@@ -655,6 +663,36 @@ export default function App() {
     await api.fs.write(token, newPath, content);
     await loadFileTree();
     handleSetActivePath(newPath);
+  };
+
+  const getNextUntitledName = () => {
+    let maxIdx = 0;
+    if (fileTree && fileTree.children) {
+      fileTree.children.forEach(node => {
+        const match = node.name.match(/^untitled-(\d+)\.txt$/i);
+        if (match) maxIdx = Math.max(maxIdx, parseInt(match[1], 10));
+      });
+    }
+    openTabs.forEach(tab => {
+      const match = tab.split("/").pop()?.match(/^untitled-(\d+)\.txt$/i);
+      if (match) maxIdx = Math.max(maxIdx, parseInt(match[1], 10));
+    });
+    return `untitled-${maxIdx + 1}.txt`;
+  };
+
+  const handleCreateNewTab = async () => {
+    if (!token) return;
+    const filename = getNextUntitledName();
+    if (activeAutosaveEnabled) {
+      await api.fs.write(token, filename, "");
+      await loadFileTree();
+      handleSetActivePath(filename);
+    } else {
+      if (!openTabs.includes(filename)) {
+        setOpenTabs(prev => [...prev, filename]);
+      }
+      setActivePath(filename);
+    }
   };
 
   const handleCreateFolder = async (dirPath: string, name: string) => {
@@ -969,6 +1007,14 @@ export default function App() {
                   </span>
                 </div>
               ))}
+              <div
+                className="workarea-tab"
+                style={{ padding: "0 10px", cursor: "pointer", color: "var(--muted)", border: "none", background: "transparent", minWidth: "auto" }}
+                onClick={handleCreateNewTab}
+                title="New file"
+              >
+                <Plus size={16} />
+              </div>
             </div>
           )}
 

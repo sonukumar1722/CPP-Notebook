@@ -11,6 +11,7 @@
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.2",
     "@monaco-editor/react": "^4.7.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@uiw/react-codemirror": "^4.23.7",
     "lucide-react": "^1.14.0",
     "marked": "^14.1.2",
@@ -18,6 +19,7 @@
     "react-dom": "^18.3.1",
     "react-dropzone": "^15.0.0",
     "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {

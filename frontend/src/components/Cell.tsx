@@ -3,6 +3,8 @@ import { NotebookCell, OutputItem, CellStatus } from "../types";
 import { Play, Square, Trash, ArrowUp, ArrowDown, Code, Type, Copy, X, Eraser } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 // Strip ANSI escape codes produced by xeus-cling tracebacks
 // eslint-disable-next-line no-control-regex
@@ -216,7 +218,26 @@ export function Cell({
         <div className="cell-editor">
           {cell.cell_type === "markdown" && !isEditing ? (
             <div className="markdown-preview" onClick={() => setIsEditing(true)}>
-              <ReactMarkdown>{cell.source || "*Empty — click to edit*"}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  code({node, inline, className, children, ...props}: any) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        {...props}
+                        children={String(children).replace(/\n$/, "")}
+                        style={theme === "dark" ? vscDarkPlus as any : vs as any}
+                        language={match[1]}
+                        PreTag="div"
+                      />
+                    ) : (
+                      <code {...props} className={className}>
+                        {children}
+                      </code>
+                    );
+                  }
+                }}
+              >{cell.source || "*Empty — click to edit*"}</ReactMarkdown>
             </div>
           ) : cell.cell_type === "markdown" ? (
             <textarea

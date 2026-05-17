@@ -2,6 +2,8 @@ import React, { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { ZoomIn, ZoomOut, Maximize2, ImageOff, FileQuestion, Download, Trash2, Eye, Edit3 } from "lucide-react";
 import Editor from "@monaco-editor/react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface FileViewerProps {
   activePath: string | null;
@@ -100,18 +102,26 @@ function MarkdownViewer({ textContent, theme, onUpdate }: { textContent: string;
       ) : (
         <div className="markdown-file-body">
           <div className="markdown-file-doc" onClick={() => setIsEditing(true)}>
-            <button
-              className="markdown-corner-btn"
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsEditing(true);
+            <ReactMarkdown
+              components={{
+                code({node, inline, className, children, ...props}: any) {
+                  const match = /language-(\w+)/.exec(className || "");
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      {...props}
+                      children={String(children).replace(/\n$/, "")}
+                      style={theme === "dark" ? vscDarkPlus as any : vs as any}
+                      language={match[1]}
+                      PreTag="div"
+                    />
+                  ) : (
+                    <code {...props} className={className}>
+                      {children}
+                    </code>
+                  );
+                }
               }}
-              title="Switch to edit"
-              type="button"
-            >
-              <Edit3 size={15} />
-            </button>
-            <ReactMarkdown>{textContent || "*Empty file — click Edit to start writing*"}</ReactMarkdown>
+            >{textContent || "*Empty file — click anywhere to start writing*"}</ReactMarkdown>
           </div>
         </div>
       )}
