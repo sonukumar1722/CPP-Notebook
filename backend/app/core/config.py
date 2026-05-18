@@ -8,6 +8,7 @@ Unrecognised variables are silently ignored (extra="ignore").
 """
 
 from pathlib import Path
+from typing import List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,13 +30,25 @@ class Settings(BaseSettings):
     # Root directory that holds every user's workspace sub-folder
     workspace_root: Path = Field(default=Path("workspaces"))
 
-    # URL of the React dev-server — used in the CORS allow-list
+    # Root directory for file uploads
+    upload_root: Path = Field(default=Path("uploads"))
+
+    # Comma-separated list of allowed CORS origins.
+    # Example: "http://localhost:5173,https://cppnote.vercel.app"
     frontend_origin: str = "http://localhost:5173"
+
+    @property
+    def allowed_origins(self) -> List[str]:
+        """Parse the comma-separated origin string into a list."""
+        return [o.strip() for o in self.frontend_origin.split(",") if o.strip()]
+
+    # JWT secret — MUST be changed in production
+    jwt_secret: str = "change-me"
 
     # PostgreSQL connection string (asyncpg driver)
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/cppnote"
 
-    # Single-user auth (no longer primarily used, but keeping defaults)
+    # Single-user auth credentials
     user_email: str = "admin@cppnote.local"
     user_password: str = "cppnote123"
     display_name: str = "Developer"

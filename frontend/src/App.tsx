@@ -21,7 +21,8 @@ import { FileViewer } from "./components/FileViewer";
 import { Cell } from "./components/Cell";
 import { ProfileModal } from "./components/ProfileModal";
 
-const WS_BASE = "ws://localhost:8000";
+// WS_BASE is derived from VITE_API_URL at build time (http → ws, https → wss)
+const WS_BASE = api.wsBaseUrl;
 const LAST_PATH_KEY = "cppnote-last-path";
 const TEXT_AUTOSAVE_KEY = "cppnote-text-autosave";
 

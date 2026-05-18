@@ -3,10 +3,18 @@
  * ----------
  * Typed HTTP client for communicating with the FastAPI backend.
  * Provides wrappers for authentication, notebooks, and filesystem operations.
+ *
+ * API_BASE is resolved at build time from the VITE_API_URL environment variable.
+ * For local dev: http://localhost:8000
+ * For production (Vercel + hosted backend): https://your-backend-url.com
  */
 import { AuthResponse, KernelSpec, Notebook, NotebookSummary, UserProfile } from "../types";
 
-const API_BASE = "http://localhost:8000";
+// Pull the backend URL from Vite env — falls back to localhost for local dev.
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+
+// WebSocket base: swap http(s) for ws(s) automatically.
+const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 /**
  * Extracts a human-readable error message from FastAPI HTTP 422/400 validation responses.
@@ -61,7 +69,8 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
 
 export const api = {
   baseUrl: API_BASE,
-  
+  wsBaseUrl: WS_BASE,
+
   // ── Auth ──────────────────────────────────────────────────────────────
   register(email: string, password: string, displayName: string) {
     return request<AuthResponse>("/api/auth/register", {
@@ -78,7 +87,7 @@ export const api = {
   me(token: string) {
     return request<UserProfile>("/api/auth/me", {}, token);
   },
-  
+
   // ── Legacy Notebooks (Mostly unused now in favour of fs endpoints) ─────
   listNotebooks(token: string) {
     return request<NotebookSummary[]>("/api/notebooks", {}, token);
@@ -121,7 +130,7 @@ export const api = {
     }
     return response.json();
   },
-  
+
   // ── Filesystem (Current architecture) ─────────────────────────────────
   fs: {
     list(token: string) {
@@ -135,7 +144,7 @@ export const api = {
         throw new Error("Failed to read file");
       }
       const contentType = response.headers.get("content-type") || "";
-      
+
       // Images are returned as Blobs so they can be rendered via URL.createObjectURL
       if (
         contentType.includes("image/") ||
@@ -143,16 +152,16 @@ export const api = {
       ) {
         return response.blob();
       }
-      
+
       // Notebooks are parsed into standard JS objects
       if (path.endsWith(".cpynb")) {
         return response.json();
       }
-      
+
       // Text files are wrapped in { content: "..." } by the backend
       const payload = await response.json().catch(() => null);
       if (payload && typeof payload.content === "string") return payload.content;
-      
+
       // Fallback for empty/unknown
       return "";
     },
