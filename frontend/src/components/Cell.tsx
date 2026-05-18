@@ -1,3 +1,11 @@
+/**
+ * Cell.tsx
+ * --------
+ * Core notebook component responsible for rendering individual cells (Code or Markdown).
+ * Supports executing C++ code, editing with Monaco, rendering outputs, handling standard input,
+ * and standard notebook operations (move, delete, toggle type).
+ */
+
 import React, { useRef, useEffect, useState, useMemo } from "react";
 import { NotebookCell, OutputItem, CellStatus } from "../types";
 import { Play, Square, Trash, ArrowUp, ArrowDown, Code, Type, Copy, X, Eraser } from "lucide-react";
@@ -35,6 +43,9 @@ interface CellProps {
   onClearCell: () => void;
 }
 
+/**
+ * Returns a human-readable execution status label for the top-left of the cell.
+ */
 function execLabel(status: CellStatus, order?: number | null) {
   if (status === "running") return "[*]";
   if (status === "queued") return "[…]";
@@ -52,6 +63,7 @@ export function Cell({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-switch to edit mode if type changes to code
   useEffect(() => { if (cell.cell_type === "code") setIsEditing(true); }, [cell.cell_type]);
 
   // Auto-focus the stdin input whenever a prompt appears
@@ -61,6 +73,7 @@ export function Cell({
     }
   }, [prompt]);
 
+  // Handle clicking outside a markdown cell to render it
   const handleBlur = (e: React.FocusEvent) => {
     if (cell.cell_type === "markdown" && !containerRef.current?.contains(e.relatedTarget as Node)) {
       if (cell.source.trim()) setIsEditing(false);
@@ -84,7 +97,7 @@ export function Cell({
   const hasOutput = outputs.length > 0 || !!prompt;
   const shouldShowOutputPanel = hasOutput || isRunning;
 
-  // Merge consecutive same-stream outputs so we don't create hundreds of tiny <pre> blocks
+  // Merge consecutive same-stream outputs (e.g. rapid stdout prints) so we don't create hundreds of tiny <pre> blocks
   const mergedOutputs = useMemo(() => {
     type MergedItem = OutputItem & { _key: number };
     const merged: MergedItem[] = [];
@@ -97,7 +110,7 @@ export function Cell({
         prev.stream === o.stream
       ) {
         // Merge text into previous block
-        merged[merged.length - 1] = { ...prev, text: prev.text + o.text };
+        merged[merged.length - 1] = { ...prev, text: (prev.text || "") + (o.text || "") };
       } else {
         merged.push({ ...o, _key: i });
       }
@@ -105,6 +118,10 @@ export function Cell({
     return merged;
   }, [outputs]);
 
+  /**
+   * Translates output payload data into appropriate React elements.
+   * Handles stream text, error tracebacks, images (base64), HTML, and plain text.
+   */
   const renderOutput = (output: OutputItem & { _key: number }) => {
     if (output.kind === "stream") {
       return (
@@ -138,6 +155,7 @@ export function Cell({
     return null;
   };
 
+  // Dynamic height calculation based on lines of code
   const editorHeight = Math.max(80, Math.min(600, cell.source.split("\n").length * 20 + 24));
 
   return (

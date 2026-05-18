@@ -1,3 +1,10 @@
+/**
+ * Navbar.tsx
+ * ----------
+ * Global top navigation bar for the CppNote application.
+ * Contains global controls (save, run all, theme toggle, profile dropdown)
+ * and kernel connection status for notebooks.
+ */
 import React, { useState } from "react";
 import { UserProfile, KernelSpec } from "../types";
 import { api } from "../lib/api";
@@ -30,10 +37,12 @@ interface NavbarProps {
   onConnect: () => void;
 }
 
+/** Fallback to the first letter of a user's name if no avatar is provided. */
 function getAvatarLetter(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
+/** Normalise avatar URLs (handles absolute HTTP URLs, data URIs, and backend-relative paths). */
 function getAvatarUrl(url?: string | null) {
   if (!url) return null;
   if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
@@ -46,6 +55,7 @@ export function Navbar({
   onThemeToggle, onSave, onAutosaveToggle, onRunAll, onStopAll,
   onClearOutputs, onRestartKernel, onKernelSelect, onOpenProfile, onLogout, onConnect,
 }: NavbarProps) {
+  // Determine capabilities based on the currently active file
   const isNotebook = activePath?.endsWith(".cpynb");
   const isEditable = !!activePath && !activePath.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i);
   const fileName = activePath ? activePath.split("/").pop() : null;
@@ -55,6 +65,7 @@ export function Navbar({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropRef = React.useRef<HTMLDivElement>(null);
 
+  // Close profile dropdown when clicking outside of it
   React.useEffect(() => {
     if (!dropdownOpen) return;
     const close = (e: MouseEvent) => { if (!dropRef.current?.contains(e.target as Node)) setDropdownOpen(false); };
@@ -73,7 +84,7 @@ export function Navbar({
 
   return (
     <nav className="navbar glass-panel">
-      {/* Left */}
+      {/* ── Left Section: Save, Run, Clear ── */}
       <div className="nav-section">
         {/* Save — visible for all editable files */}
         {isEditable && (
@@ -111,7 +122,7 @@ export function Navbar({
           </>
         )}
 
-        {/* Autosave — visible for all editable files */}
+        {/* Autosave Toggle — visible for all editable files */}
         {isEditable && (
           <button
             className={`autosave-pill ${autosaveEnabled ? "on" : "off"}`}
@@ -126,7 +137,7 @@ export function Navbar({
         )}
       </div>
 
-      {/* Center */}
+      {/* ── Center Section: File Name / App Title ── */}
       <div className="nav-section nav-center-section" style={{ flex: 1, justifyContent: "center" }}>
         <div className="nav-title">
           {runningAll ? (
@@ -134,6 +145,7 @@ export function Navbar({
           ) : fileName ? (
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ color: "var(--muted)", fontSize: 13 }}>{fileName}</span>
+              {/* Pulsing unsaved indicator */}
               {isDirty && (
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)", display: "inline-block", animation: "pulse-dot 2s ease infinite" }} />
               )}
@@ -147,10 +159,11 @@ export function Navbar({
         </div>
       </div>
 
-      {/* Right */}
+      {/* ── Right Section: Kernel, Theme, Profile ── */}
       <div className="nav-section">
         {isNotebook && (
           <>
+            {/* Kernel Selector */}
             <div className="kernel-selector">
               <Server size={11} style={{ opacity: 0.6 }} />
               <select value={selectedKernel} onChange={e => onKernelSelect(e.target.value)}>
@@ -175,7 +188,7 @@ export function Navbar({
                   : <WifiOff size={14} />}
             </button>
 
-            {/* Restart — clears output, execution counts, reconnects */}
+            {/* Restart Kernel — clears output, execution counts, reconnects */}
             <button className="nav-icon-btn" onClick={onRestartKernel} title="Restart kernel (clears outputs & counts)">
               <RefreshCw size={14} />
             </button>
@@ -184,17 +197,19 @@ export function Navbar({
           </>
         )}
 
+        {/* Theme Toggle */}
         <button className="nav-icon-btn" onClick={onThemeToggle} title="Toggle theme">
           {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
-        {/* Avatar */}
+        {/* User Profile Avatar / Dropdown */}
         <div ref={dropRef} style={{ position: "relative" }}>
           <button className="avatar-btn" onClick={() => setDropdownOpen(o => !o)} title={user.display_name}>
             {avatarUrl
               ? <img src={avatarUrl} alt={user.display_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : getAvatarLetter(user.display_name)}
           </button>
+          
           {dropdownOpen && (
             <div className="avatar-dropdown">
               <div className="avatar-dropdown-top">

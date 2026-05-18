@@ -1,12 +1,22 @@
+/**
+ * lib/api.ts
+ * ----------
+ * Typed HTTP client for communicating with the FastAPI backend.
+ * Provides wrappers for authentication, notebooks, and filesystem operations.
+ */
 import { AuthResponse, KernelSpec, Notebook, NotebookSummary, UserProfile } from "../types";
 
 const API_BASE = "http://localhost:8000";
 
+/**
+ * Extracts a human-readable error message from FastAPI HTTP 422/400 validation responses.
+ */
 function formatErrorDetail(detail: unknown): string {
   if (typeof detail === "string") {
     return detail;
   }
 
+  // Handle FastAPI's array of Pydantic validation errors
   if (Array.isArray(detail)) {
     return detail
       .map((item) => {
@@ -22,6 +32,7 @@ function formatErrorDetail(detail: unknown): string {
       .join("; ");
   }
 
+  // Handle generic nested detail objects
   if (detail && typeof detail === "object") {
     const payload = detail as { detail?: unknown; message?: unknown };
     return formatErrorDetail(payload.detail ?? payload.message);
@@ -30,6 +41,9 @@ function formatErrorDetail(detail: unknown): string {
   return "Request failed";
 }
 
+/**
+ * Core generic fetch wrapper that handles JSON headers, JWT injection, and error throwing.
+ */
 async function request<T>(path: string, init: RequestInit = {}, token?: string | null): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
@@ -47,6 +61,8 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
 
 export const api = {
   baseUrl: API_BASE,
+  
+  // ── Auth ──────────────────────────────────────────────────────────────
   register(email: string, password: string, displayName: string) {
     return request<AuthResponse>("/api/auth/register", {
       method: "POST",
@@ -62,6 +78,8 @@ export const api = {
   me(token: string) {
     return request<UserProfile>("/api/auth/me", {}, token);
   },
+  
+  // ── Legacy Notebooks (Mostly unused now in favour of fs endpoints) ─────
   listNotebooks(token: string) {
     return request<NotebookSummary[]>("/api/notebooks", {}, token);
   },
@@ -103,6 +121,8 @@ export const api = {
     }
     return response.json();
   },
+  
+  // ── Filesystem (Current architecture) ─────────────────────────────────
   fs: {
     list(token: string) {
       return request<import("../types").FileNode>("/api/fs/list", {}, token);
@@ -115,27 +135,31 @@ export const api = {
         throw new Error("Failed to read file");
       }
       const contentType = response.headers.get("content-type") || "";
-      // Images → Blob
+      
+      // Images are returned as Blobs so they can be rendered via URL.createObjectURL
       if (
         contentType.includes("image/") ||
         /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(path)
       ) {
         return response.blob();
       }
-      // Notebooks are stored as JSON documents. Other text files are wrapped
-      // by the backend as { content }, even though the response is JSON.
+      
+      // Notebooks are parsed into standard JS objects
       if (path.endsWith(".cpynb")) {
         return response.json();
       }
-      // Text files → backend wraps in { content: "..." }
+      
+      // Text files are wrapped in { content: "..." } by the backend
       const payload = await response.json().catch(() => null);
       if (payload && typeof payload.content === "string") return payload.content;
-      // fallback
+      
+      // Fallback for empty/unknown
       return "";
     },
     write(token: string, path: string, content: string | object) {
       return request<{status: string}>("/api/fs/write", {
         method: "POST",
+        // If content is an object (like a Notebook), stringify it first
         body: JSON.stringify({ path, content: typeof content === "string" ? content : JSON.stringify(content) })
       }, token);
     },

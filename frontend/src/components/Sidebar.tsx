@@ -1,3 +1,9 @@
+/**
+ * Sidebar.tsx
+ * -----------
+ * Left-hand collapsible sidebar panel containing the workspace file tree.
+ * Provides controls for creating new files and folders, and uploading files.
+ */
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, FilePlus, FolderPlus, Upload } from "lucide-react";
 import { UserProfile, FileNode } from "../types";
@@ -24,28 +30,34 @@ export function Sidebar({
   user, fileTree, activePath, dirtyPath, collapsed, baseUrl, token,
   onToggleCollapse, onSelect, onRename, onDelete, onNewFile, onNewFolder, onUpload,
 }: SidebarProps) {
+  // Track the most recently clicked folder to determine where new files should be created
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  
+  // State for the inline create-file/folder input row
   const [createDraft, setCreateDraft] = useState<{ type: "file" | "folder"; dirPath: string; name: string } | null>(null);
 
+  /** Triggers the inline input UI for a new file or folder. */
   const startCreate = (type: "file" | "folder", dirPath: string) => {
     setCreateDraft({ type, dirPath, name: "" });
   };
 
+  /** Commits the creation of a new file or folder via the backend. */
   const submitCreate = () => {
     const name = createDraft?.name.trim();
     if (!createDraft || !name) return;
+    
     if (createDraft.type === "file") {
       onNewFile(createDraft.dirPath, name);
     } else {
       onNewFolder(createDraft.dirPath, name);
     }
-    setCreateDraft(null);
+    setCreateDraft(null); // Close the input row
   };
 
   return (
     <>
       <aside className={`sidebar glass-panel ${collapsed ? "collapsed" : ""}`}>
-        {/* Action buttons */}
+        {/* ── Top Actions ── */}
         <div className="sidebar-actions">
           <button className="nav-icon-btn" title="New File" onClick={() => startCreate("file", selectedFolder ?? "")} style={{ flex: 1, borderRadius: 8 }}>
             <FilePlus size={15} />
@@ -58,6 +70,7 @@ export function Sidebar({
           </button>
         </div>
 
+        {/* ── Inline File/Folder Creation Input ── */}
         {createDraft && (
           <div className="inline-create-row">
             <span className="inline-create-icon">
@@ -68,6 +81,7 @@ export function Sidebar({
               value={createDraft.name}
               onChange={e => setCreateDraft(draft => draft ? { ...draft, name: e.target.value } : draft)}
               onBlur={() => {
+                // Cancel if blurred with an empty name
                 if (!createDraft.name.trim()) setCreateDraft(null);
               }}
               onKeyDown={e => {
@@ -80,7 +94,7 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Active file path strip */}
+        {/* ── Active File Path Breadcrumb ── */}
         {activePath && (
           <div style={{
             fontSize: 10, color: "var(--muted)", padding: "6px 12px",
@@ -90,7 +104,8 @@ export function Sidebar({
             📄 /{activePath}
           </div>
         )}
-        {/* Workspace label below path strip */}
+        
+        {/* ── Workspace Tree Container ── */}
         <div className="workspace-label">
           Workspace
         </div>
@@ -113,6 +128,7 @@ export function Sidebar({
         </div>
       </aside>
 
+      {/* ── Sidebar Collapse Toggle Button ── */}
       <button
         style={{
           position: "absolute",

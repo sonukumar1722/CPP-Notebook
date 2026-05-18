@@ -1,3 +1,9 @@
+/**
+ * ProfileModal.tsx
+ * ----------------
+ * A modal overlay that allows users to edit their display name, bio, and avatar.
+ * Handles both plain text JSON updates and multipart/form-data for image uploads.
+ */
 import React, { useState, useRef } from "react";
 import { UserProfile } from "../types";
 import { X, Camera, User } from "lucide-react";
@@ -12,10 +18,12 @@ interface ProfileModalProps {
   onSave: (name: string, bio: string, avatarUrl?: string) => Promise<void>;
 }
 
+/** Fallback to the first letter of a user's name if no avatar is provided. */
 function getAvatarLetter(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
+/** Normalise avatar URLs (handles absolute HTTP URLs, data URIs, and backend-relative paths). */
 function getAvatarUrl(url?: string | null) {
   if (!url) return null;
   if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
@@ -27,26 +35,35 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
   const [bio, setBio] = useState(user.bio || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track local preview data URI and the actual File object to be uploaded
   const [avatarPreview, setAvatarPreview] = useState<string | null>(() => getAvatarUrl(user.avatar_url));
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /** Handles image selection from the hidden file input. */
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Please select an image file"); return; }
     if (file.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB"); return; }
+    
     setError(null);
     setAvatarFile(file);
+    
+    // Read the file locally to show a preview immediately
     const reader = new FileReader();
     reader.onload = ev => setAvatarPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
 
+  /** Saves profile changes via the appropriate API endpoint based on whether an image was attached. */
   const handleSave = async () => {
     setSaving(true); setError(null);
     try {
       let newAvatarUrl: string | undefined;
+      
+      // If a new avatar was selected, we must use a multipart form upload
       if (avatarFile) {
         const fd = new FormData();
         fd.append("file", avatarFile);
@@ -59,6 +76,7 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
         const data = await res.json();
         newAvatarUrl = data.avatar_url;
       } else {
+        // Just updating text fields; standard JSON request
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -66,6 +84,8 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
         });
         if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || "Failed");
       }
+      
+      // Bubble the updated details back to the App component
       await onSave(name, bio, newAvatarUrl);
       onClose();
     } catch (e) {
@@ -93,7 +113,7 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
 
         {/* Body */}
         <div className="profile-body">
-          {/* Avatar */}
+          {/* Avatar Area */}
           <div className="avatar-section">
             <div style={{ position: "relative" }}>
               <div
@@ -111,18 +131,19 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
                 <Camera size={13} />
               </div>
             </div>
+            {/* Hidden file input triggered by clicking the avatar */}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarChange} />
             <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Click avatar to change photo</span>
           </div>
 
-          {/* Error */}
+          {/* Error Message */}
           {error && (
             <div className="profile-error">
               {error}
             </div>
           )}
 
-          {/* Fields */}
+          {/* Form Fields */}
           <div className="profile-field">
             <label>Email</label>
             <input className="profile-input" value={user.email} disabled />
@@ -149,7 +170,7 @@ export function ProfileModal({ user, token, onClose, onLogout, onSave }: Profile
             />
           </div>
 
-          {/* Actions */}
+          {/* Action Buttons */}
           <button
             className="profile-save-btn"
             onClick={handleSave}

@@ -1,3 +1,13 @@
+/**
+ * FileViewer.tsx
+ * --------------
+ * Dynamic viewer for various file types when opened from the sidebar.
+ * Includes sub-components for:
+ *   - Images (with pan/zoom)
+ *   - Markdown (with toggleable edit/preview modes)
+ *   - Plain Text/Code (Monaco editor with syntax highlighting)
+ *   - Unsupported/Binary (shows download/delete options)
+ */
 import React, { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { ZoomIn, ZoomOut, Maximize2, ImageOff, FileQuestion, Download, Trash2, Eye, Edit3 } from "lucide-react";
@@ -16,6 +26,7 @@ interface FileViewerProps {
   onDelete?: (path: string) => void;
 }
 
+// Sets of known file extensions mapped to viewers
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 const TEXT_EXTS = new Set([
   "txt", "md", "cpp", "c", "h", "hpp", "js", "jsx", "ts", "tsx",
@@ -31,7 +42,7 @@ function getFileName(path: string) { return path.split("/").pop() || path; }
 // ── Image Viewer ──────────────────────────────────────────────
 function ImageViewer({ imageUrl, activePath }: { imageUrl: string | null; activePath: string }) {
   const [zoom, setZoom] = useState(1);
-  const [fit, setFit] = useState(true);
+  const [fit, setFit] = useState(true); // "fit to window" mode
 
   if (!imageUrl) return (
     <div className="empty-state">
@@ -88,6 +99,7 @@ function MarkdownViewer({ textContent, theme, onUpdate }: { textContent: string;
               value={textContent}
               onChange={val => onUpdate(val ?? "")}
               onMount={(editor) => {
+                // Auto-switch to preview mode when clicking away from the editor
                 editor.onDidBlurEditorWidget(() => setIsEditing(false));
               }}
               options={{
@@ -133,6 +145,8 @@ function MarkdownViewer({ textContent, theme, onUpdate }: { textContent: string;
 function TextViewer({ textContent, theme, activePath, onUpdate }: { textContent: string; theme: "light" | "dark"; activePath: string; onUpdate: (v: string) => void }) {
   const [fontSize, setFontSize] = useState(14);
   const ext = getExt(activePath);
+  
+  // Map file extensions to Monaco language identifiers
   const langMap: Record<string, string> = {
     js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
     cpp: "cpp", c: "c", h: "cpp", hpp: "cpp", py: "python", java: "java",
@@ -188,6 +202,8 @@ function UnsupportedFile({ activePath, baseUrl, token, onDelete }: {
 }) {
   const name = getFileName(activePath);
   const ext = getExt(activePath);
+  
+  // Directly trigger a download of the binary file
   const handleDownload = useCallback(async () => {
     try {
       const res = await fetch(`${baseUrl}/api/fs/read?path=${encodeURIComponent(activePath)}`, {
@@ -222,6 +238,7 @@ function UnsupportedFile({ activePath, baseUrl, token, onDelete }: {
 
 // ── Main FileViewer ───────────────────────────────────────────
 export function FileViewer({ activePath, textContent, imageUrl, theme, baseUrl, token, onUpdate, onDelete }: FileViewerProps) {
+  // Render empty state if no file is selected
   if (!activePath) {
     return (
       <div className="empty-state">
@@ -236,15 +253,16 @@ export function FileViewer({ activePath, textContent, imageUrl, theme, baseUrl, 
 
   const ext = getExt(activePath);
 
+  // Dispatch to sub-components based on file extension
   if (IMAGE_EXTS.has(ext)) return <ImageViewer imageUrl={imageUrl ?? null} activePath={activePath} />;
-
   if (ext === "md" && textContent !== null) return <MarkdownViewer textContent={textContent} theme={theme} onUpdate={onUpdate} />;
-
   if (TEXT_EXTS.has(ext) && textContent !== null) return <TextViewer textContent={textContent} theme={theme} activePath={activePath} onUpdate={onUpdate} />;
 
+  // Still loading text content
   if ((TEXT_EXTS.has(ext) || ext === "md") && textContent === null) {
     return <div className="empty-state"><p style={{ color: "var(--muted)" }}>Loading…</p></div>;
   }
 
+  // Fallback for unsupported binary/unknown files
   return <UnsupportedFile activePath={activePath} baseUrl={baseUrl} token={token} onDelete={onDelete} />;
 }

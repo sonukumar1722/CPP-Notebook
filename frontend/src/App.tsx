@@ -1,3 +1,15 @@
+/**
+ * App.tsx
+ * -------
+ * Main application component for CppNote.
+ * Manages global application state including:
+ *   - Authentication and user session
+ *   - Workspace file tree and tab navigation
+ *   - Active file editor (notebook, markdown, plain text, or image)
+ *   - WebSocket connection for kernel execution
+ *   - Output buffering and cell execution tracking
+ */
+
 import { Plus } from "lucide-react";
 import React, { FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";

@@ -1,3 +1,9 @@
+/**
+ * FileTree.tsx
+ * ------------
+ * A recursive tree component that renders files and folders in the workspace.
+ * Supports context menus for renaming, deleting, and downloading files.
+ */
 import {
   ChevronDown, ChevronRight, FileCode, FileImage, FileText,
   Folder, FolderOpen, Plus, Trash, Edit2, File as FileIcon, Download,
@@ -25,18 +31,24 @@ export function FileTree({
   onSelect, onRename, onDelete, onNewFile, onNewFolder, onSelectFolder,
   depth = 0,
 }: FileTreeProps) {
+  // Folder open/closed state
   const [isOpen, setIsOpen] = useState(true);
+  
+  // Coordinates for the custom right-click context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  
+  // Inline rename state
   const [isRenaming, setIsRenaming] = useState(false);
   const [editName, setEditName] = useState(node.name);
 
+  // The root node (depth=0) is hidden in the UI; we only render its children.
   const isRoot = node.name === "root" && depth === 0;
   const isDir = node.is_dir;
   const isDirty = !isDir && dirtyPath === node.path;
   const isActive = activePath === node.path;
 
+  // Dismiss context menu when clicking elsewhere
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
-
   React.useEffect(() => {
     if (!contextMenu) return;
     const close = () => closeContextMenu();
@@ -44,6 +56,7 @@ export function FileTree({
     return () => window.removeEventListener("click", close);
   }, [contextMenu, closeContextMenu]);
 
+  /** Maps file extensions to appropriate icons. */
   const getIcon = () => {
     if (isDir) return isOpen
       ? <FolderOpen size={14} style={{ color: "var(--warning)" }} />
@@ -55,9 +68,11 @@ export function FileTree({
     return <FileIcon size={14} style={{ color: "var(--muted)" }} />;
   };
 
+  /** Commit an inline rename operation to the backend. */
   const submitRename = () => {
     setIsRenaming(false);
     if (editName && editName !== node.name) {
+      // Reconstruct the full path with the new name
       const parent = node.path.includes("/") ? node.path.substring(0, node.path.lastIndexOf("/")) : "";
       onRename(node.path, parent ? `${parent}/${editName}` : editName);
     } else {
@@ -65,6 +80,7 @@ export function FileTree({
     }
   };
 
+  /** Direct download of a file from the workspace. */
   const handleDownload = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!baseUrl || !token) return;
@@ -82,6 +98,7 @@ export function FileTree({
     closeContextMenu();
   }, [baseUrl, token, node, closeContextMenu]);
 
+  /** Left click: open file or toggle folder. */
   const handleClick = () => {
     if (isDir) {
       setIsOpen(o => !o);
@@ -99,6 +116,7 @@ export function FileTree({
           onClick={handleClick}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY }); }}
         >
+          {/* Node Icon */}
           <span className="file-node-icon">
             {isDir && (
               <span style={{ display: "inline-flex", transition: "transform .2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", marginRight: 2 }}>
@@ -109,6 +127,7 @@ export function FileTree({
             {getIcon()}
           </span>
 
+          {/* Label or Rename Input */}
           {isRenaming ? (
             <input
               autoFocus
@@ -123,14 +142,17 @@ export function FileTree({
             <span className="file-node-name">{node.name}</span>
           )}
 
+          {/* Unsaved changes indicator */}
           {isDirty && <span className="file-node-dirty" title="Unsaved" />}
 
+          {/* Quick Add button for directories (on hover) */}
           {isDir && (
             <div className="dir-actions" onClick={e => e.stopPropagation()}>
               <button onClick={() => onNewFile(node.path)} title="New file"><Plus size={13} /></button>
             </div>
           )}
 
+          {/* Context Menu Overlay */}
           {contextMenu && (
             <div
               className="context-menu"
@@ -165,6 +187,7 @@ export function FileTree({
         </div>
       )}
 
+      {/* Recursive children rendering for open directories */}
       {isDir && isOpen && node.children && (
         <div className="file-children">
           {node.children.map(child => (

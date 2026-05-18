@@ -1,3 +1,13 @@
+"""
+api/auth.py
+-----------
+Authentication and user profile endpoints.
+
+Provides registration, login, logout, and profile management capabilities.
+Stores user avatars in a shared directory outside the user's workspace.
+Uses bcrypt for secure password hashing.
+"""
+
 import base64
 import uuid
 from pathlib import Path
@@ -15,10 +25,13 @@ from app.models import User
 from app.services.auth import create_access_token, get_current_user
 from app.core.config import settings
 
+# Global directory for user avatars
 AVATAR_DIR = settings.workspace_root.parent / "avatars"
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
+# ── Request / Response Models ──────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
     email: str
@@ -32,6 +45,7 @@ class RegisterRequest(BaseModel):
 
 
 def _profile(user: User) -> dict:
+    """Helper to serialise a User ORM instance into a safe dictionary."""
     return {
         "id": user.id,
         "email": user.email,
@@ -42,8 +56,16 @@ def _profile(user: User) -> dict:
     }
 
 
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
 @router.post("/register")
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Register a new user account.
+    Fails if the email is already in use.
+    Returns a JWT access token upon success.
+    """
+    # Check for existing user
     result = await db.execute(select(User).where(User.email == req.email))
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -51,8 +73,11 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             detail="Email already registered",
         )
         
+    # Hash password using bcrypt
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(req.password.encode('utf-8'), salt).decode('utf-8')
+    
+    # Create new record
     new_user = User(
         email=req.email,
         hashed_password=hashed_password,
@@ -62,12 +87,18 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(new_user)
     
+    # Auto-login the user
     token = create_access_token({"sub": new_user.id})
     return {"access_token": token, "token_type": "bearer", "user": _profile(new_user)}
 
 
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Authenticate a user by email and password.
+    Returns a JWT access token.
+    """
+    # Look up user by email
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalar_one_or_none()
     
@@ -77,6 +108,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid credentials",
         )
         
+    # Verify password hash
     try:
         is_valid = bcrypt.checkpw(req.password.encode('utf-8'), user.hashed_password.encode('utf-8'))
     except ValueError:
@@ -88,17 +120,23 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid credentials",
         )
         
+    # Create JWT
     token = create_access_token({"sub": user.id})
     return {"access_token": token, "token_type": "bearer", "user": _profile(user)}
 
 
 @router.post("/logout")
 async def logout():
+    """
+    Logout is handled client-side by discarding the JWT.
+    This endpoint exists primarily for API completeness.
+    """
     return {"message": "Logged out"}
 
 
 @router.get("/me")
 async def me(current_user: User = Depends(get_current_user)):
+    """Return the profile of the currently authenticated user."""
     return _profile(current_user)
 
 
@@ -113,40 +151,56 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update profile. Accepts multipart/form-data (with optional avatar file) or JSON."""
+    """
+    Update the user's profile details.
+    
+    Accepts two content types:
+      - multipart/form-data: When uploading a new avatar image along with fields.
+      - application/json: When only updating text fields (name, bio).
+    """
     content_type = request.headers.get("content-type", "")
     avatar_url: Optional[str] = current_user.avatar_url
 
+    # Handle multipart form data (with file upload)
     if "multipart/form-data" in content_type:
         form = await request.form()
         display_name = form.get("display_name") or current_user.display_name
         bio = form.get("bio") or current_user.bio
         avatar_file = form.get("file")
 
+        # Save the uploaded avatar image
         if avatar_file and hasattr(avatar_file, "read"):
             AVATAR_DIR.mkdir(parents=True, exist_ok=True)
             ext = Path(avatar_file.filename or "avatar.jpg").suffix.lower()
             fname = f"{current_user.id}{ext}"
             dest = AVATAR_DIR / fname
+            
             content = await avatar_file.read()
             dest.write_bytes(content)
+            
+            # Store the relative URL for the avatar
             avatar_url = f"/api/auth/avatar/{fname}"
+            
+    # Handle plain JSON data
     else:
         body = await request.json()
         display_name = body.get("display_name") or current_user.display_name
         bio = body.get("bio", current_user.bio)
 
+    # Update database record
     current_user.display_name = str(display_name)
     current_user.bio = str(bio) if bio is not None else None
     current_user.avatar_url = avatar_url
+    
     await db.commit()
     await db.refresh(current_user)
+    
     return _profile(current_user)
 
 
 @router.get("/avatar/{filename}")
 async def get_avatar(filename: str):
-    """Serve avatar images."""
+    """Serve uploaded avatar images."""
     from fastapi.responses import FileResponse
     path = AVATAR_DIR / filename
     if not path.exists():
