@@ -97,7 +97,7 @@ export function Sidebar({
         {/* ── Active File Path Breadcrumb ── */}
         {activePath && (
           <div style={{
-            fontSize: 10, color: "var(--muted)", padding: "6px 12px",
+            fontSize: 12, color: "var(--muted)", padding: "6px 12px",
             borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }} title={`/${activePath}`}>

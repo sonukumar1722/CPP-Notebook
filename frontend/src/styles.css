@@ -810,6 +810,9 @@ button.icon-button:hover {
 
 .cell-card:hover {
   box-shadow: 0 6px 20px rgba(0, 0, 0, .15);
+  border-color: rgba(8, 145, 178, .4);
+  border-width: 1px;
+  border-radius: 12px;
 }
 
 .cell-card:focus-within {
@@ -824,17 +827,12 @@ button.icon-button:hover {
   padding: 6px 12px;
   background: rgba(0, 0, 0, .15);
   border-bottom: 1px solid var(--line);
-  opacity: 0.5;
+  opacity: 1;
   transition: opacity .2s;
 }
 
 [data-theme="light"] .cell-toolbar {
   background: rgba(0, 0, 0, .03);
-}
-
-.cell-card:hover .cell-toolbar,
-.cell-card:focus-within .cell-toolbar {
-  opacity: 1;
 }
 
 .cell-toolbar-left,

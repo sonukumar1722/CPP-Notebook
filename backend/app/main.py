@@ -44,7 +44,7 @@ app.include_router(fs.router)
 # Allow the React dev server (and production build origin) to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=[settings.frontend_origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
